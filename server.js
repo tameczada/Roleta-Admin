@@ -20,6 +20,8 @@ const PORT = process.env.PORT || 3001;
 const allowedOrigins = [
     "https://roleta-admin.onrender.com",
     "https://luyan-tamec.github.io/roleta-leoeisa",
+    "https://roleta-admin.onrender.com/admin/",
+  "https://luyan-tamec.github.io",
   "http://localhost:3000",
   "http://localhost:3001",
   "http://localhost:5500",
@@ -80,3 +82,4 @@ app.listen(PORT, () => {
   console.log(`   ADMIN_SECRET: ${process.env.ADMIN_SECRET ? "✅ definida" : "⚠️  NÃO definida"}`);
   console.log(`   FRONTEND_URL: ${process.env.FRONTEND_URL || "(não definida)"}\n`);
 });
+

@@ -18,6 +18,8 @@ const PORT = process.env.PORT || 3001;
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
 const allowedOrigins = [
+    "https://roleta-admin.onrender.com",
+    "https://luyan-tamec.github.io/roleta-leoeisa",
   "http://localhost:3000",
   "http://localhost:3001",
   "http://localhost:5500",

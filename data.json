@@ -1,0 +1,41 @@
+{
+  "config": {
+    "titulo": "Rindo e Apoiando Maximo",
+    "channelName": "luyan_tamec",
+    "tempoPadrao": 5,
+    "modoCor": "colorido",
+    "temaAtivo": "Cereja",
+    "autoRemoverVencedor": false,
+    "autoOcultarPainel": true,
+    "temaAutoRotar": true
+  },
+  "sons": {
+    "musicaSelecionada": 8,
+    "volumeMusica": 0.1,
+    "volumeTick": 0.12,
+    "tocarMusicaAoGirar": false
+  },
+  "arena": {
+    "userCooldown": 15000,
+    "globalCooldown": 5000,
+    "maxBonecos": 30,
+    "posicaoBoneco": "atras"
+  },
+  "imagens": {
+    "bonecos": [],
+    "centro": null,
+    "leoeisa": null,
+    "back": null,
+    "gato1": null,
+    "will": null
+  },
+  "filmes": {
+    "apiUrl": "https://cinevote.onrender.com/filmes",
+    "categoriaPadrao": "Terror",
+    "votosAtivo": true,
+    "votosBase": 50,
+    "ticketsPorVotos": 1,
+    "ticketsMin": 1,
+    "ticketsMax": 20
+  }
+}

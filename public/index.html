@@ -239,8 +239,10 @@
     <button class="active" data-tab="config">⚙️ Geral</button>
     <button data-tab="sons">🎵 Sons</button>
     <button data-tab="arena">🐾 Arena</button>
+    <button data-tab="visual">🎨 Visual</button>
     <button data-tab="imagens">🖼️ Imagens</button>
     <button data-tab="filmes">🎬 Filmes</button>
+    <button data-tab="historico">🏆 Histórico</button>
     <button data-tab="estado">📦 Estado</button>
   </nav>
 
@@ -334,11 +336,9 @@
 
     <!-- ═══ ABA: ARENA ═══ -->
     <div class="tab-panel" id="tab-arena">
+
       <div class="card">
-        <h3>🐾 Configurações da Arena de Bonecos</h3>
-        <p class="info" style="margin-bottom:14px">
-          Usuários que digitam <span class="code">!entrar</span> no chat aparecem como bonecos na tela.
-        </p>
+        <h3>🐾 Configurações da Arena</h3>
         <div class="form-grid">
           <div class="field">
             <label>Cooldown por usuário (ms)</label>
@@ -360,6 +360,10 @@
               <option value="desativado">🚫 Desativado</option>
             </select>
           </div>
+          <div class="field">
+            <label>Comando de entrada</label>
+            <input type="text" id="ar-comando" placeholder="!entrar">
+          </div>
         </div>
         <div class="actions">
           <button class="btn btn-primary" id="saveArena">💾 Salvar arena</button>
@@ -367,9 +371,53 @@
       </div>
 
       <div class="card">
-        <h3>🎨 Cor dos nomes</h3>
-        <p class="info" style="margin-bottom:14px">Como a cor do nome é exibida quando o boneco spawna.</p>
+        <h3>📐 Visual dos Bonecos</h3>
         <div class="form-grid">
+          <div class="field">
+            <label>Escala: <span id="lbl-escala">1.0x</span></label>
+            <input type="range" id="ar-escala" min="0.3" max="3" step="0.1" value="1">
+          </div>
+          <div class="field">
+            <label>Velocidade: <span id="lbl-velocidade">1.0x</span></label>
+            <input type="range" id="ar-velocidade" min="0.1" max="5" step="0.1" value="1">
+          </div>
+          <div class="field">
+            <label>Tempo de vida (seg, 0 = infinito)</label>
+            <input type="number" id="ar-tempoVida" min="0" placeholder="0">
+          </div>
+          <div class="field">
+            <label>Animação de entrada</label>
+            <select id="ar-animEntrada">
+              <option value="normal">➡️ Normal</option>
+              <option value="queda">⬇️ Queda</option>
+              <option value="fade">✨ Fade</option>
+              <option value="bounce">🏀 Bounce</option>
+            </select>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" id="saveVisualBonecos">💾 Salvar visual</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>🏷️ Estilo dos Nomes</h3>
+        <div class="form-grid">
+          <div class="field">
+            <label>Fonte</label>
+            <select id="ar-nomeFonte">
+              <option value="Arial">Arial</option>
+              <option value="Verdana">Verdana</option>
+              <option value="Georgia">Georgia</option>
+              <option value="Courier New">Courier New</option>
+              <option value="Impact">Impact</option>
+              <option value="Comic Sans MS">Comic Sans</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Tamanho: <span id="lbl-nomeTamanho">13px</span></label>
+            <input type="range" id="ar-nomeTamanho" min="8" max="32" step="1" value="13">
+          </div>
           <div class="field">
             <label>Modo de cor</label>
             <select id="ar-nomeCores">
@@ -398,9 +446,29 @@
           </div>
         </div>
         <div class="actions">
-          <button class="btn btn-primary" id="saveArena2">💾 Salvar cores</button>
+          <button class="btn btn-primary" id="saveArena2">💾 Salvar nomes</button>
         </div>
       </div>
+
+      <div class="card">
+        <h3>🧪 Modo Teste</h3>
+        <p class="info" style="margin-bottom:14px">Spawna bonecos com nomes fictícios sem precisar do chat da Twitch.</p>
+        <div class="form-grid">
+          <div class="check-row field">
+            <input type="checkbox" id="ar-modoTeste">
+            <label for="ar-modoTeste" style="text-transform:none;font-size:.9rem">Ativar modo teste</label>
+          </div>
+          <div class="field">
+            <label>Intervalo entre spawns (seg)</label>
+            <input type="number" id="ar-testeIntervalo" min="1" max="60" placeholder="3">
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-warn" id="saveModoteste">💾 Salvar modo teste</button>
+          <button class="btn btn-danger" id="btnLimparArena">🗑️ Limpar arena agora</button>
+        </div>
+      </div>
+
     </div>
 
     <!-- ═══ ABA: IMAGENS ═══ -->
@@ -484,7 +552,42 @@
       </div>
     </div>
 
-    <!-- ═══ ABA: ESTADO ═══ -->
+    <!-- ═══ ABA: VISUAL ═══ -->
+    <div class="tab-panel" id="tab-visual">
+      <div class="card">
+        <h3>🎨 Efeitos Visuais do Fundo</h3>
+        <p class="info" style="margin-bottom:14px">Controla o blur e brilho da imagem de fundo em tempo real.</p>
+        <div class="form-grid">
+          <div class="field">
+            <label>Blur do fundo: <span id="lbl-blur">2px</span></label>
+            <input type="range" id="vis-blur" min="0" max="20" step="0.5" value="2">
+          </div>
+          <div class="field">
+            <label>Brilho do fundo: <span id="lbl-brilho">60%</span></label>
+            <input type="range" id="vis-brilho" min="0" max="1" step="0.05" value="0.6">
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" id="saveVisual">💾 Salvar visual</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ ABA: HISTÓRICO ═══ -->
+    <div class="tab-panel" id="tab-historico">
+      <div class="card">
+        <h3>🏆 Histórico de Vencedores</h3>
+        <div class="actions" style="margin-bottom:14px">
+          <button class="btn btn-ghost btn-sm" id="refreshHistorico">🔄 Atualizar</button>
+          <button class="btn btn-danger btn-sm" id="clearHistorico">🗑️ Limpar histórico</button>
+        </div>
+        <div id="historicoList" style="display:flex;flex-direction:column;gap:8px">
+          <div class="info">Carregando…</div>
+        </div>
+      </div>
+    </div>
+
+        <!-- ═══ ABA: ESTADO ═══ -->
     <div class="tab-panel" id="tab-estado">
       <div class="card">
         <h3>📦 Exportar / Importar Estado</h3>
@@ -608,8 +711,9 @@ document.querySelectorAll('nav.tabs button').forEach(btn => {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-    if (btn.dataset.tab === 'imagens') { loadBonecos(); loadStaticSlots(); }
-    if (btn.dataset.tab === 'estado') loadStateViewer();
+    if (btn.dataset.tab === 'imagens')   { loadBonecos(); loadStaticSlots(); }
+    if (btn.dataset.tab === 'historico') loadHistorico();
+    if (btn.dataset.tab === 'estado')    loadStateViewer();
   };
 });
 
@@ -617,7 +721,7 @@ document.querySelectorAll('nav.tabs button').forEach(btn => {
 // INIT — carrega todas as seções
 // ──────────────────────────────────────────────────────────────────────────────
 async function init() {
-  await Promise.all([loadConfig(), loadSons(), loadArena(), loadFilmes()]);
+  await Promise.all([loadConfig(), loadSons(), loadArena(), loadVisual(), loadFilmes()]);
   connectSSE();
 }
 
@@ -729,13 +833,38 @@ async function loadArena() {
   document.getElementById('ar-globalCooldown').value = data.globalCooldown;
   document.getElementById('ar-maxBonecos').value = data.maxBonecos;
   document.getElementById('ar-posicao').value = data.posicaoBoneco;
-  // Cores
+  document.getElementById('ar-comando').value = data.comando || '!entrar';
+  // Visual bonecos
+  const esc = data.escala ?? 1;
+  document.getElementById('ar-escala').value = esc;
+  document.getElementById('lbl-escala').textContent = esc + 'x';
+  const vel = data.velocidade ?? 1;
+  document.getElementById('ar-velocidade').value = vel;
+  document.getElementById('lbl-velocidade').textContent = vel + 'x';
+  document.getElementById('ar-tempoVida').value = data.tempoVida ?? 0;
+  document.getElementById('ar-animEntrada').value = data.animEntrada || 'normal';
+  // Nomes
+  document.getElementById('ar-nomeFonte').value = data.nomeFonte || 'Arial';
+  const nt = data.nomeTamanho ?? 13;
+  document.getElementById('ar-nomeTamanho').value = nt;
+  document.getElementById('lbl-nomeTamanho').textContent = nt + 'px';
   document.getElementById('ar-nomeCores').value = data.nomeCores || 'aleatorio';
   document.getElementById('ar-nomeCorFixa').value = data.nomeCorFixa || '#ffffff';
   document.getElementById('ar-nomeCorFixaHex').value = data.nomeCorFixa || '#ffffff';
   renderPaleta(data.nomePaleta || []);
   toggleCorFields(data.nomeCores || 'aleatorio');
+  // Modo teste
+  document.getElementById('ar-modoTeste').checked = !!data.modoTeste;
+  document.getElementById('ar-testeIntervalo').value = data.testeIntervalo ?? 3;
 }
+
+// Sliders arena
+document.getElementById('ar-escala').oninput = e =>
+  document.getElementById('lbl-escala').textContent = parseFloat(e.target.value).toFixed(1) + 'x';
+document.getElementById('ar-velocidade').oninput = e =>
+  document.getElementById('lbl-velocidade').textContent = parseFloat(e.target.value).toFixed(1) + 'x';
+document.getElementById('ar-nomeTamanho').oninput = e =>
+  document.getElementById('lbl-nomeTamanho').textContent = e.target.value + 'px';
 
 let _paleta = [];
 function renderPaleta(cores) {
@@ -757,8 +886,6 @@ function toggleCorFields(modo) {
 }
 
 document.getElementById('ar-nomeCores').onchange = e => toggleCorFields(e.target.value);
-
-// Sincroniza color picker ↔ input texto
 document.getElementById('ar-nomeCorFixa').oninput = e => {
   document.getElementById('ar-nomeCorFixaHex').value = e.target.value;
 };
@@ -766,7 +893,6 @@ document.getElementById('ar-nomeCorFixaHex').oninput = e => {
   if (/^#[0-9a-fA-F]{6}$/.test(e.target.value))
     document.getElementById('ar-nomeCorFixa').value = e.target.value;
 };
-
 document.getElementById('ar-paletaAdd').onclick = () => {
   const cor = document.getElementById('ar-paletaPicker').value;
   if (!_paleta.includes(cor)) { _paleta.push(cor); renderPaleta(_paleta); }
@@ -775,30 +901,115 @@ document.getElementById('ar-paletaClear').onclick = () => renderPaleta([]);
 
 document.getElementById('saveArena').onclick = async () => {
   try {
-    await api('/api/arena', {
-      method: 'PATCH',
-      body: {
-        userCooldown: parseInt(document.getElementById('ar-userCooldown').value),
-        globalCooldown: parseInt(document.getElementById('ar-globalCooldown').value),
-        maxBonecos: parseInt(document.getElementById('ar-maxBonecos').value),
-        posicaoBoneco: document.getElementById('ar-posicao').value,
-      }
-    });
+    await api('/api/arena', { method: 'PATCH', body: {
+      userCooldown: parseInt(document.getElementById('ar-userCooldown').value),
+      globalCooldown: parseInt(document.getElementById('ar-globalCooldown').value),
+      maxBonecos: parseInt(document.getElementById('ar-maxBonecos').value),
+      posicaoBoneco: document.getElementById('ar-posicao').value,
+      comando: document.getElementById('ar-comando').value || '!entrar',
+    }});
     toast('✅ Arena salva!');
+  } catch (e) { toast('❌ ' + e.message, 'err'); }
+};
+
+document.getElementById('saveVisualBonecos').onclick = async () => {
+  try {
+    await api('/api/arena', { method: 'PATCH', body: {
+      escala: parseFloat(document.getElementById('ar-escala').value),
+      velocidade: parseFloat(document.getElementById('ar-velocidade').value),
+      tempoVida: parseInt(document.getElementById('ar-tempoVida').value),
+      animEntrada: document.getElementById('ar-animEntrada').value,
+    }});
+    toast('✅ Visual dos bonecos salvo!');
   } catch (e) { toast('❌ ' + e.message, 'err'); }
 };
 
 document.getElementById('saveArena2').onclick = async () => {
   try {
-    await api('/api/arena', {
-      method: 'PATCH',
-      body: {
-        nomeCores: document.getElementById('ar-nomeCores').value,
-        nomeCorFixa: document.getElementById('ar-nomeCorFixaHex').value || document.getElementById('ar-nomeCorFixa').value,
-        nomePaleta: _paleta,
-      }
-    });
-    toast('✅ Cores salvas!');
+    await api('/api/arena', { method: 'PATCH', body: {
+      nomeFonte: document.getElementById('ar-nomeFonte').value,
+      nomeTamanho: parseInt(document.getElementById('ar-nomeTamanho').value),
+      nomeCores: document.getElementById('ar-nomeCores').value,
+      nomeCorFixa: document.getElementById('ar-nomeCorFixaHex').value || document.getElementById('ar-nomeCorFixa').value,
+      nomePaleta: _paleta,
+    }});
+    toast('✅ Nomes salvos!');
+  } catch (e) { toast('❌ ' + e.message, 'err'); }
+};
+
+document.getElementById('saveModoteste').onclick = async () => {
+  try {
+    await api('/api/arena', { method: 'PATCH', body: {
+      modoTeste: document.getElementById('ar-modoTeste').checked,
+      testeIntervalo: parseInt(document.getElementById('ar-testeIntervalo').value),
+    }});
+    toast('✅ Modo teste salvo!');
+  } catch (e) { toast('❌ ' + e.message, 'err'); }
+};
+
+document.getElementById('btnLimparArena').onclick = async () => {
+  if (!confirm('Limpar todos os bonecos da arena agora?')) return;
+  try {
+    await api('/api/arena/limpar', { method: 'POST' });
+    toast('🗑️ Arena limpa!');
+  } catch (e) { toast('❌ ' + e.message, 'err'); }
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
+// ABA VISUAL
+// ──────────────────────────────────────────────────────────────────────────────
+async function loadVisual() {
+  const { data } = await api('/api/visual');
+  document.getElementById('vis-blur').value = data.fundoBlur ?? 2;
+  document.getElementById('lbl-blur').textContent = (data.fundoBlur ?? 2) + 'px';
+  document.getElementById('vis-brilho').value = data.fundoBrilho ?? 0.6;
+  document.getElementById('lbl-brilho').textContent = Math.round((data.fundoBrilho ?? 0.6) * 100) + '%';
+}
+
+document.getElementById('vis-blur').oninput = e =>
+  document.getElementById('lbl-blur').textContent = parseFloat(e.target.value).toFixed(1) + 'px';
+document.getElementById('vis-brilho').oninput = e =>
+  document.getElementById('lbl-brilho').textContent = Math.round(e.target.value * 100) + '%';
+
+document.getElementById('saveVisual').onclick = async () => {
+  try {
+    await api('/api/visual', { method: 'PATCH', body: {
+      fundoBlur: parseFloat(document.getElementById('vis-blur').value),
+      fundoBrilho: parseFloat(document.getElementById('vis-brilho').value),
+    }});
+    toast('✅ Visual salvo!');
+  } catch (e) { toast('❌ ' + e.message, 'err'); }
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
+// ABA HISTÓRICO
+// ──────────────────────────────────────────────────────────────────────────────
+async function loadHistorico() {
+  const el = document.getElementById('historicoList');
+  el.innerHTML = '<div class="info"><span class="spinner"></span> Carregando…</div>';
+  try {
+    const { data } = await api('/api/historico');
+    if (!data.length) { el.innerHTML = '<div class="info">Nenhum vencedor registrado ainda.</div>'; return; }
+    el.innerHTML = data.map((v, i) => `
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
+        <span style="font-size:1.1rem;font-weight:700;color:var(--accent);min-width:28px">#${i+1}</span>
+        <div style="flex:1">
+          <div style="font-weight:700">${v.nome}</div>
+          ${v.item ? `<div style="font-size:.8rem;color:var(--muted)">${v.item}</div>` : ''}
+        </div>
+        <div style="font-size:.75rem;color:var(--muted)">${new Date(v.timestamp).toLocaleString('pt-BR')}</div>
+      </div>
+    `).join('');
+  } catch (e) { el.innerHTML = `<div class="info" style="color:var(--danger)">${e.message}</div>`; }
+}
+
+document.getElementById('refreshHistorico').onclick = loadHistorico;
+document.getElementById('clearHistorico').onclick = async () => {
+  if (!confirm('Limpar todo o histórico de vencedores?')) return;
+  try {
+    await api('/api/historico', { method: 'DELETE' });
+    toast('🗑️ Histórico limpo!');
+    loadHistorico();
   } catch (e) { toast('❌ ' + e.message, 'err'); }
 };
 

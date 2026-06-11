@@ -1,7 +1,7 @@
 // routes/arena.js
 const express = require("express");
-const router = express.Router();
-const store = require("../store");
+const router  = express.Router();
+const store   = require("../store");
 const { requireAuth } = require("../middleware/auth");
 const { emit } = require("./events");
 
@@ -10,29 +10,48 @@ router.get("/", (req, res) => {
 });
 
 router.patch("/", requireAuth, (req, res) => {
-  const posicoes = ["frente","atras","desativado"];
-  const modosCor = ["aleatorio","fixo","desativado"];
+  const posicoes  = ["frente","atras","desativado"];
+  const modosCor  = ["aleatorio","fixo","desativado"];
+  const animacoes = ["normal","queda","fade","bounce"];
+
+  const allowed = [
+    "userCooldown","globalCooldown","maxBonecos","posicaoBoneco",
+    "nomeCores","nomeCorFixa","nomePaleta",
+    "escala","velocidade","tempoVida",
+    "nomeFonte","nomeTamanho",
+    "animEntrada","comando",
+    "modoTeste","testeIntervalo",
+  ];
+
   const patch = {};
-  for (const key of ["userCooldown","globalCooldown","maxBonecos","posicaoBoneco",
-                     "nomeCores","nomeCorFixa","nomePaleta"]) {
-    if (key in req.body) patch[key] = req.body[key];
-  }
+  for (const key of allowed) { if (key in req.body) patch[key] = req.body[key]; }
+
+  // Validações
   if ("posicaoBoneco" in patch && !posicoes.includes(patch.posicaoBoneco))
-    return res.status(400).json({ ok: false, error: `posicaoBoneco deve ser: ${posicoes.join(", ")}` });
+    return res.status(400).json({ ok: false, error: `posicaoBoneco: ${posicoes.join(", ")}` });
   if ("nomeCores" in patch && !modosCor.includes(patch.nomeCores))
-    return res.status(400).json({ ok: false, error: `nomeCores deve ser: ${modosCor.join(", ")}` });
+    return res.status(400).json({ ok: false, error: `nomeCores: ${modosCor.join(", ")}` });
+  if ("animEntrada" in patch && !animacoes.includes(patch.animEntrada))
+    return res.status(400).json({ ok: false, error: `animEntrada: ${animacoes.join(", ")}` });
   if ("nomePaleta" in patch && !Array.isArray(patch.nomePaleta))
-    return res.status(400).json({ ok: false, error: "nomePaleta deve ser um array de cores hex." });
-  for (const num of ["userCooldown","globalCooldown","maxBonecos"]) {
-    if (num in patch) {
-      const v = parseInt(patch[num]);
-      if (isNaN(v) || v < 0) return res.status(400).json({ ok: false, error: `${num} deve ser >= 0.` });
-      patch[num] = v;
-    }
+    return res.status(400).json({ ok: false, error: "nomePaleta deve ser array." });
+
+  for (const num of ["userCooldown","globalCooldown","maxBonecos","nomeTamanho","tempoVida","testeIntervalo"]) {
+    if (num in patch) { patch[num] = parseInt(patch[num]); }
   }
+  for (const flt of ["escala","velocidade"]) {
+    if (flt in patch) { patch[flt] = parseFloat(patch[flt]); }
+  }
+
   const updated = store.patch("arena", patch);
   emit("arena", updated);
   res.json({ ok: true, data: updated });
+});
+
+// ── Modo teste: limpar arena ──────────────────────────────────────────────────
+router.post("/limpar", requireAuth, (req, res) => {
+  emit("arena_limpar", {});
+  res.json({ ok: true });
 });
 
 module.exports = router;

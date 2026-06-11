@@ -1,22 +1,11 @@
-// server.js
 require("dotenv").config();
-
 const express = require("express");
 const cors    = require("cors");
 const path    = require("path");
 
-const configRouter  = require("./routes/config");
-const sonsRouter    = require("./routes/sons");
-const arenaRouter   = require("./routes/arena");
-const imagensRouter = require("./routes/imagens");
-const filmesRouter  = require("./routes/filmes");
-const estadoRouter  = require("./routes/estado");
-const { router: eventsRouter } = require("./routes/events");
-
 const app  = express();
 const PORT = process.env.PORT || 3001;
 
-// ── CORS ──────────────────────────────────────────────────────────────────────
 const allowedOrigins = [
     "https://roleta-admin.onrender.com",
     "https://luyan-tamec.github.io/roleta-leoeisa",
@@ -30,6 +19,7 @@ const allowedOrigins = [
   ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
 ];
 
+
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
@@ -42,44 +32,25 @@ app.use(cors({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// ── Arquivos estáticos ────────────────────────────────────────────────────────
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/admin",   express.static(path.join(__dirname, "public")));
 
-// ── Health check ──────────────────────────────────────────────────────────────
-app.get("/", (req, res) => {
-  res.json({
-    ok: true,
-    service: "Roleta Admin API",
-    version: "2.0.0",
-    painel: `${process.env.BACKEND_URL || "http://localhost:" + PORT}/admin`,
-  });
-});
+app.get("/", (req, res) => res.json({ ok: true, service: "Roleta Admin API", version: "3.0.0" }));
 
-// ── Rotas ─────────────────────────────────────────────────────────────────────
-app.use("/api/config",  configRouter);
-app.use("/api/sons",    sonsRouter);
-app.use("/api/arena",   arenaRouter);
-app.use("/api/imagens", imagensRouter);
-app.use("/api/filmes",  filmesRouter);
-app.use("/api/estado",  estadoRouter);
-app.use("/api/events",  eventsRouter);   // SSE — sem auth, público
+app.use("/api/config",    require("./routes/config"));
+app.use("/api/sons",      require("./routes/sons"));
+app.use("/api/arena",     require("./routes/arena"));
+app.use("/api/visual",    require("./routes/visual"));
+app.use("/api/imagens",   require("./routes/imagens"));
+app.use("/api/filmes",    require("./routes/filmes"));
+app.use("/api/estado",    require("./routes/estado"));
+app.use("/api/historico", require("./routes/historico"));
+app.use("/api/events",    require("./routes/events").router);
 
-// ── 404 ───────────────────────────────────────────────────────────────────────
 app.use((req, res) => res.status(404).json({ ok: false, error: "Rota não encontrada." }));
+app.use((err, req, res, _next) => res.status(500).json({ ok: false, error: err.message }));
 
-// ── Error handler ─────────────────────────────────────────────────────────────
-app.use((err, req, res, _next) => {
-  console.error("[erro]", err.message);
-  res.status(500).json({ ok: false, error: err.message || "Erro interno." });
-});
-
-// ── Start ─────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`\n🎡 Roleta Admin API v2 — http://localhost:${PORT}`);
-  console.log(`   Painel: http://localhost:${PORT}/admin`);
-  console.log(`   ADMIN_SECRET: ${process.env.ADMIN_SECRET ? "✅ definida" : "⚠️  NÃO definida"}`);
-  console.log(`   FRONTEND_URL: ${process.env.FRONTEND_URL || "(não definida)"}\n`);
+  console.log(`\n🎡 Roleta Admin API v3 — http://localhost:${PORT}/admin`);
+  console.log(`   ADMIN_SECRET: ${process.env.ADMIN_SECRET ? "✅" : "⚠️  NÃO definida"}\n`);
 });
-

@@ -466,6 +466,7 @@
         <div class="actions">
           <button class="btn btn-warn" id="saveModoteste">💾 Salvar modo teste</button>
           <button class="btn btn-danger" id="btnLimparArena">🗑️ Limpar arena agora</button>
+          <button class="btn btn-warn" id="btnReloadRoleta">🔄 Recarregar roleta (F5)</button>
         </div>
       </div>
 
@@ -944,6 +945,14 @@ document.getElementById('saveModoteste').onclick = async () => {
       testeIntervalo: parseInt(document.getElementById('ar-testeIntervalo').value),
     }});
     toast('✅ Modo teste salvo!');
+  } catch (e) { toast('❌ ' + e.message, 'err'); }
+};
+
+document.getElementById('btnReloadRoleta').onclick = async () => {
+  if (!confirm('Recarregar a página da roleta agora?')) return;
+  try {
+    await api('/api/events/reload', { method: 'POST' });
+    toast('🔄 Reload enviado para a roleta!');
   } catch (e) { toast('❌ ' + e.message, 'err'); }
 };
 

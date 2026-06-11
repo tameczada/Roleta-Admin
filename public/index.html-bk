@@ -365,42 +365,6 @@
           <button class="btn btn-primary" id="saveArena">💾 Salvar arena</button>
         </div>
       </div>
-
-      <div class="card">
-        <h3>🎨 Cor dos nomes</h3>
-        <p class="info" style="margin-bottom:14px">Como a cor do nome é exibida quando o boneco spawna.</p>
-        <div class="form-grid">
-          <div class="field">
-            <label>Modo de cor</label>
-            <select id="ar-nomeCores">
-              <option value="aleatorio">🎲 Aleatório (paleta)</option>
-              <option value="fixo">🎨 Cor fixa</option>
-              <option value="desativado">🚫 Desativado (CSS padrão)</option>
-            </select>
-          </div>
-          <div class="field" id="ar-corFixaField">
-            <label>Cor fixa</label>
-            <div style="display:flex;gap:8px;align-items:center">
-              <input type="color" id="ar-nomeCorFixa" value="#ffffff"
-                style="width:48px;height:38px;padding:2px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);cursor:pointer">
-              <input type="text" id="ar-nomeCorFixaHex" placeholder="#ffffff" style="flex:1">
-            </div>
-          </div>
-        </div>
-        <div class="field" style="margin-top:14px" id="ar-paletaField">
-          <label>Paleta personalizada <span class="info">(vazia = usa paleta interna)</span></label>
-          <div id="ar-paletaSwatches" style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;min-height:32px"></div>
-          <div style="display:flex;gap:8px">
-            <input type="color" id="ar-paletaPicker"
-              style="width:48px;height:38px;padding:2px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);cursor:pointer">
-            <button class="btn btn-ghost btn-sm" id="ar-paletaAdd">+ Adicionar cor</button>
-            <button class="btn btn-danger btn-sm" id="ar-paletaClear">🗑️ Limpar</button>
-          </div>
-        </div>
-        <div class="actions">
-          <button class="btn btn-primary" id="saveArena2">💾 Salvar cores</button>
-        </div>
-      </div>
     </div>
 
     <!-- ═══ ABA: IMAGENS ═══ -->
@@ -729,49 +693,7 @@ async function loadArena() {
   document.getElementById('ar-globalCooldown').value = data.globalCooldown;
   document.getElementById('ar-maxBonecos').value = data.maxBonecos;
   document.getElementById('ar-posicao').value = data.posicaoBoneco;
-  // Cores
-  document.getElementById('ar-nomeCores').value = data.nomeCores || 'aleatorio';
-  document.getElementById('ar-nomeCorFixa').value = data.nomeCorFixa || '#ffffff';
-  document.getElementById('ar-nomeCorFixaHex').value = data.nomeCorFixa || '#ffffff';
-  renderPaleta(data.nomePaleta || []);
-  toggleCorFields(data.nomeCores || 'aleatorio');
 }
-
-let _paleta = [];
-function renderPaleta(cores) {
-  _paleta = [...cores];
-  const el = document.getElementById('ar-paletaSwatches');
-  el.innerHTML = _paleta.map((c, i) => `
-    <div style="display:flex;align-items:center;gap:4px">
-      <div style="width:28px;height:28px;border-radius:6px;background:${c};border:1px solid var(--border)"></div>
-      <span style="font-size:.8rem;font-family:monospace">${c}</span>
-      <button onclick="removeCor(${i})" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:.9rem">×</button>
-    </div>
-  `).join('') || '<span class="info">Nenhuma cor — usando paleta interna</span>';
-}
-function removeCor(i) { _paleta.splice(i, 1); renderPaleta(_paleta); }
-
-function toggleCorFields(modo) {
-  document.getElementById('ar-corFixaField').style.display  = modo === 'fixo'      ? 'flex' : 'none';
-  document.getElementById('ar-paletaField').style.display   = modo === 'aleatorio' ? 'block' : 'none';
-}
-
-document.getElementById('ar-nomeCores').onchange = e => toggleCorFields(e.target.value);
-
-// Sincroniza color picker ↔ input texto
-document.getElementById('ar-nomeCorFixa').oninput = e => {
-  document.getElementById('ar-nomeCorFixaHex').value = e.target.value;
-};
-document.getElementById('ar-nomeCorFixaHex').oninput = e => {
-  if (/^#[0-9a-fA-F]{6}$/.test(e.target.value))
-    document.getElementById('ar-nomeCorFixa').value = e.target.value;
-};
-
-document.getElementById('ar-paletaAdd').onclick = () => {
-  const cor = document.getElementById('ar-paletaPicker').value;
-  if (!_paleta.includes(cor)) { _paleta.push(cor); renderPaleta(_paleta); }
-};
-document.getElementById('ar-paletaClear').onclick = () => renderPaleta([]);
 
 document.getElementById('saveArena').onclick = async () => {
   try {
@@ -785,20 +707,6 @@ document.getElementById('saveArena').onclick = async () => {
       }
     });
     toast('✅ Arena salva!');
-  } catch (e) { toast('❌ ' + e.message, 'err'); }
-};
-
-document.getElementById('saveArena2').onclick = async () => {
-  try {
-    await api('/api/arena', {
-      method: 'PATCH',
-      body: {
-        nomeCores: document.getElementById('ar-nomeCores').value,
-        nomeCorFixa: document.getElementById('ar-nomeCorFixaHex').value || document.getElementById('ar-nomeCorFixa').value,
-        nomePaleta: _paleta,
-      }
-    });
-    toast('✅ Cores salvas!');
   } catch (e) { toast('❌ ' + e.message, 'err'); }
 };
 

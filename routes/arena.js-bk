@@ -11,18 +11,12 @@ router.get("/", (req, res) => {
 
 router.patch("/", requireAuth, (req, res) => {
   const posicoes = ["frente","atras","desativado"];
-  const modosCor = ["aleatorio","fixo","desativado"];
   const patch = {};
-  for (const key of ["userCooldown","globalCooldown","maxBonecos","posicaoBoneco",
-                     "nomeCores","nomeCorFixa","nomePaleta"]) {
+  for (const key of ["userCooldown","globalCooldown","maxBonecos","posicaoBoneco"]) {
     if (key in req.body) patch[key] = req.body[key];
   }
   if ("posicaoBoneco" in patch && !posicoes.includes(patch.posicaoBoneco))
     return res.status(400).json({ ok: false, error: `posicaoBoneco deve ser: ${posicoes.join(", ")}` });
-  if ("nomeCores" in patch && !modosCor.includes(patch.nomeCores))
-    return res.status(400).json({ ok: false, error: `nomeCores deve ser: ${modosCor.join(", ")}` });
-  if ("nomePaleta" in patch && !Array.isArray(patch.nomePaleta))
-    return res.status(400).json({ ok: false, error: "nomePaleta deve ser um array de cores hex." });
   for (const num of ["userCooldown","globalCooldown","maxBonecos"]) {
     if (num in patch) {
       const v = parseInt(patch[num]);

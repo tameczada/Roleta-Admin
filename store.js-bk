@@ -31,13 +31,10 @@ const DEFAULT_STATE = {
 
   // ── Arena / Bonecos ───────────────────────────────────────────────
   arena: {
-    userCooldown:   15000,
-    globalCooldown: 5000,
-    maxBonecos:     30,
-    posicaoBoneco:  "frente",
-    nomeCores:      "aleatorio", // "aleatorio" | "fixo" | "desativado"
-    nomeCorFixa:    "#ffffff",
-    nomePaleta:     [],          // [] = usa paleta interna do frontend
+    userCooldown: 15000,     // ms por usuário
+    globalCooldown: 5000,    // ms entre spawns
+    maxBonecos: 30,
+    posicaoBoneco: "frente", // "frente" | "atras" | "desativado"
   },
 
   // ── Imagens personalizadas ────────────────────────────────────────

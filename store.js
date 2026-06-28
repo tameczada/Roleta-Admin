@@ -73,6 +73,9 @@ const DEFAULT_STATE = {
     ticketsMax: 20,
   },
 
+  // Participantes importados via CSV
+  participantes: [],
+
   // Histórico dos últimos 50 vencedores
   historico: [],
 };

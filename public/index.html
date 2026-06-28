@@ -245,6 +245,7 @@
     <button data-tab="imagens">🖼️ Imagens</button>
     <button data-tab="filmes">🎬 Filmes</button>
     <button data-tab="historico">🏆 Histórico</button>
+    <button data-tab="participantes">📋 Participantes</button>
     <button data-tab="estado">📦 Estado</button>
   </nav>
 
@@ -589,6 +590,40 @@
       </div>
     </div>
 
+        <!-- ═══ ABA: PARTICIPANTES ═══ -->
+    <div class="tab-panel" id="tab-participantes">
+      <div class="card">
+        <h3>📋 Importar Participantes via CSV</h3>
+        <p class="info" style="margin-bottom:14px">
+          Importe um arquivo <code>.csv</code> com um nome por linha.<br>
+          Nomes duplicados são ignorados automaticamente.
+        </p>
+        <label class="dropzone" id="csvDropzone">
+          <input type="file" id="csvInput" accept=".csv,.txt" style="display:none">
+          📂 Clique ou arraste o arquivo CSV aqui
+        </label>
+        <div id="csvPreview" style="margin-top:12px;display:none">
+          <p class="info" id="csvInfo"></p>
+          <div style="max-height:160px;overflow-y:auto;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-top:8px;font-family:monospace;font-size:.8rem;line-height:1.6" id="csvLista"></div>
+        </div>
+        <div class="actions" style="margin-top:14px">
+          <button class="btn btn-success" id="btnImportarCSV" disabled>⬆️ Importar para a roleta</button>
+          <button class="btn btn-ghost" id="btnLimparCSV">✖️ Limpar seleção</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>👥 Lista atual de participantes</h3>
+        <div class="actions" style="margin-bottom:12px">
+          <button class="btn btn-ghost btn-sm" id="refreshParticipantes">🔄 Atualizar</button>
+          <button class="btn btn-danger btn-sm" id="btnLimparParticipantes">🗑️ Limpar tudo</button>
+          <button class="btn btn-ghost btn-sm" id="btnExportarParticipantes">⬇️ Exportar CSV</button>
+        </div>
+        <p id="totalParticipantes" class="info" style="margin-bottom:10px"></p>
+        <div id="listaParticipantes" style="display:flex;flex-wrap:wrap;gap:8px;max-height:400px;overflow-y:auto"></div>
+      </div>
+    </div>
+
         <!-- ═══ ABA: ESTADO ═══ -->
     <div class="tab-panel" id="tab-estado">
       <div class="card">
@@ -714,7 +749,8 @@ document.querySelectorAll('nav.tabs button').forEach(btn => {
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
     if (btn.dataset.tab === 'imagens')   { loadBonecos(); loadStaticSlots(); }
-    if (btn.dataset.tab === 'historico') loadHistorico();
+    if (btn.dataset.tab === 'historico')      loadHistorico();
+    if (btn.dataset.tab === 'participantes') loadParticipantes();
     if (btn.dataset.tab === 'estado')    loadStateViewer();
   };
 });
@@ -1242,6 +1278,112 @@ document.getElementById('resetState').onclick = async () => {
   } catch (e) { toast('❌ ' + e.message, 'err'); }
 };
 
+// ──────────────────────────────────────────────────────────────────────────────
+// ABA PARTICIPANTES
+// ──────────────────────────────────────────────────────────────────────────────
+let _csvNomes = [];
+
+// Dropzone
+const csvInput   = document.getElementById('csvInput');
+const csvDropzone = document.getElementById('csvDropzone');
+csvDropzone.onclick = () => csvInput.click();
+csvDropzone.ondragover = e => { e.preventDefault(); csvDropzone.classList.add('drag'); };
+csvDropzone.ondragleave = () => csvDropzone.classList.remove('drag');
+csvDropzone.ondrop = e => {
+  e.preventDefault(); csvDropzone.classList.remove('drag');
+  if (e.dataTransfer.files[0]) processCSV(e.dataTransfer.files[0]);
+};
+csvInput.onchange = () => { if (csvInput.files[0]) processCSV(csvInput.files[0]); };
+
+function processCSV(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const lines = e.target.result.split(/\r?\n/);
+    _csvNomes = lines.map(l => l.trim()).filter(l => l.length > 0);
+    document.getElementById('csvInfo').textContent =
+      `${_csvNomes.length} nome(s) encontrado(s) em "${file.name}"`;
+    document.getElementById('csvLista').innerHTML =
+      _csvNomes.map(n => `<span style="display:block">${n}</span>`).join('');
+    document.getElementById('csvPreview').style.display = 'block';
+    document.getElementById('btnImportarCSV').disabled = _csvNomes.length === 0;
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+document.getElementById('btnLimparCSV').onclick = () => {
+  _csvNomes = [];
+  csvInput.value = '';
+  document.getElementById('csvPreview').style.display = 'none';
+  document.getElementById('btnImportarCSV').disabled = true;
+};
+
+document.getElementById('btnImportarCSV').onclick = async () => {
+  if (!_csvNomes.length) return;
+  try {
+    const res = await api('/api/participantes', { method: 'POST', body: { nomes: _csvNomes } });
+    toast(`✅ ${res.adicionados} nome(s) adicionado(s)! Total: ${res.total}`);
+    _csvNomes = [];
+    csvInput.value = '';
+    document.getElementById('csvPreview').style.display = 'none';
+    document.getElementById('btnImportarCSV').disabled = true;
+    loadParticipantes();
+  } catch (e) { toast('❌ ' + e.message, 'err'); }
+};
+
+// Lista de participantes
+async function loadParticipantes() {
+  const el = document.getElementById('listaParticipantes');
+  const tot = document.getElementById('totalParticipantes');
+  el.innerHTML = '<span class="info"><span class="spinner"></span> Carregando…</span>';
+  try {
+    const { data } = await api('/api/participantes');
+    tot.textContent = `${data.length} participante(s) na lista`;
+    if (!data.length) {
+      el.innerHTML = '<span class="info">Nenhum participante ainda.</span>';
+      return;
+    }
+    el.innerHTML = data.map(nome => `
+      <div style="display:flex;align-items:center;gap:6px;background:var(--surface2);
+        border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:.85rem">
+        <span style="flex:1">${nome}</span>
+        <button onclick="removeParticipante('${nome.replace(/'/g,"\\'")}' )"
+          style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:1rem;line-height:1">×</button>
+      </div>
+    `).join('');
+  } catch (e) {
+    el.innerHTML = `<span class="info" style="color:var(--danger)">${e.message}</span>`;
+  }
+}
+
+async function removeParticipante(nome) {
+  try {
+    await api('/api/participantes/nome/' + encodeURIComponent(nome), { method: 'DELETE' });
+    toast('🗑️ Removido: ' + nome);
+    loadParticipantes();
+  } catch (e) { toast('❌ ' + e.message, 'err'); }
+}
+
+document.getElementById('refreshParticipantes').onclick = loadParticipantes;
+
+document.getElementById('btnLimparParticipantes').onclick = async () => {
+  if (!confirm('Limpar toda a lista de participantes?')) return;
+  try {
+    await api('/api/participantes', { method: 'DELETE' });
+    toast('🗑️ Lista limpa!');
+    loadParticipantes();
+  } catch (e) { toast('❌ ' + e.message, 'err'); }
+};
+
+document.getElementById('btnExportarParticipantes').onclick = async () => {
+  const { data } = await api('/api/participantes');
+  const blob = new Blob([data.join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'participantes.csv';
+  a.click();
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Auto-login se credenciais salvas
 if (savedApi && savedSecret) {
   doLogin(savedApi, savedSecret);

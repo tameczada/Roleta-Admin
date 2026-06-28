@@ -44,7 +44,8 @@ app.use("/api/visual",    require("./routes/visual"));
 app.use("/api/imagens",   require("./routes/imagens"));
 app.use("/api/filmes",    require("./routes/filmes"));
 app.use("/api/estado",    require("./routes/estado"));
-app.use("/api/historico", require("./routes/historico"));
+app.use("/api/historico",      require("./routes/historico"));
+app.use("/api/participantes", require("./routes/participantes"));
 app.use("/api/events",    require("./routes/events").router);
 
 app.use((req, res) => res.status(404).json({ ok: false, error: "Rota não encontrada." }));

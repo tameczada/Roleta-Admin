@@ -788,7 +788,7 @@ function connectSSE() {
 async function loadConfig() {
   const { data } = await api('/api/config');
   document.getElementById('cfg-titulo').value = data.titulo || '';
-  document.getElementById('cfg-channel').value = data.channelName || '';
+  document.getElementById('cfg-channel').value = data.channelName || 'isaroza_';
   document.getElementById('cfg-tempo').value = data.tempoPadrao || 5;
   document.getElementById('cfg-modoCor').value = data.modoCor || 'colorido';
   document.getElementById('cfg-tema').value = data.temaAtivo || 'Padrão Rosa';

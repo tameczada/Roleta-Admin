@@ -21,6 +21,7 @@ router.patch("/", requireAuth, (req, res) => {
     "nomeFonte","nomeTamanho",
     "animEntrada","comando",
     "modoTeste","testeIntervalo",
+    "modoImagem","twitchClientId",
   ];
 
   const patch = {};
@@ -33,6 +34,8 @@ router.patch("/", requireAuth, (req, res) => {
     return res.status(400).json({ ok: false, error: `nomeCores: ${modosCor.join(", ")}` });
   if ("animEntrada" in patch && !animacoes.includes(patch.animEntrada))
     return res.status(400).json({ ok: false, error: `animEntrada: ${animacoes.join(", ")}` });
+  if ("modoImagem" in patch && !["boneco","perfil","aleatorio"].includes(patch.modoImagem))
+    return res.status(400).json({ ok: false, error: "modoImagem: boneco | perfil | aleatorio" });
   if ("nomePaleta" in patch && !Array.isArray(patch.nomePaleta))
     return res.status(400).json({ ok: false, error: "nomePaleta deve ser array." });
 

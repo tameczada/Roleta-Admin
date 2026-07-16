@@ -47,6 +47,9 @@ const DEFAULT_STATE = {
     // Modo teste
     modoTeste:      false,
     testeIntervalo: 3,             // segundos entre spawns no modo teste
+    // Modo de imagem dos bonecos
+    modoImagem:     "boneco",      // "boneco" | "perfil" | "aleatorio"
+    twitchClientId: "x4qevszaoxnscv462g6913dzo3m71t",
   },
 
   visual: {

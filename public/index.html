@@ -454,6 +454,28 @@
       </div>
 
       <div class="card">
+        <h3>👤 Imagem dos Bonecos</h3>
+        <p class="info" style="margin-bottom:14px">Escolha se os bonecos usam imagens locais ou a foto de perfil da Twitch do usuário.</p>
+        <div class="form-grid">
+          <div class="field">
+            <label>Modo de imagem</label>
+            <select id="ar-modoImagem">
+              <option value="boneco">🖼️ Bonecos (imagens locais/remotas)</option>
+              <option value="perfil">👤 Foto de perfil da Twitch</option>
+              <option value="aleatorio">🎲 Aleatório (mistura os dois)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Twitch Client ID</label>
+            <input type="text" id="ar-twitchClientId" placeholder="seu_client_id_aqui">
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" id="saveModoImagem">💾 Salvar modo de imagem</button>
+        </div>
+      </div>
+
+      <div class="card">
         <h3>🧪 Modo Teste</h3>
         <p class="info" style="margin-bottom:14px">Spawna bonecos com nomes fictícios sem precisar do chat da Twitch.</p>
         <div class="form-grid">
@@ -894,6 +916,9 @@ async function loadArena() {
   // Modo teste
   document.getElementById('ar-modoTeste').checked = !!data.modoTeste;
   document.getElementById('ar-testeIntervalo').value = data.testeIntervalo ?? 3;
+  // Modo imagem
+  document.getElementById('ar-modoImagem').value = data.modoImagem || 'boneco';
+  document.getElementById('ar-twitchClientId').value = data.twitchClientId || '';
 }
 
 // Sliders arena
@@ -972,6 +997,16 @@ document.getElementById('saveArena2').onclick = async () => {
       nomePaleta: _paleta,
     }});
     toast('✅ Nomes salvos!');
+  } catch (e) { toast('❌ ' + e.message, 'err'); }
+};
+
+document.getElementById('saveModoImagem').onclick = async () => {
+  try {
+    await api('/api/arena', { method: 'PATCH', body: {
+      modoImagem: document.getElementById('ar-modoImagem').value,
+      twitchClientId: document.getElementById('ar-twitchClientId').value.trim(),
+    }});
+    toast('✅ Modo de imagem salvo!');
   } catch (e) { toast('❌ ' + e.message, 'err'); }
 };
 

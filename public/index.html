@@ -1388,6 +1388,11 @@ document.getElementById('btnExportarParticipantes').onclick = async () => {
 if (savedApi && savedSecret) {
   doLogin(savedApi, savedSecret);
 }
+
+setInterval(() => {
+    location.reload();
+}, 30000);
+  
 </script>
 </body>
 </html>

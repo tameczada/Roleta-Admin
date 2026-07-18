@@ -1388,10 +1388,19 @@ document.getElementById('btnExportarParticipantes').onclick = async () => {
 if (savedApi && savedSecret) {
   doLogin(savedApi, savedSecret);
 }
+  
+const links = [
+    "https://roleta-admin.onrender.com/admin/",
+    "https://roleta-admin.onrender.com",
+    "https://roleta-admin.onrender.com/admin/",
+    "https://roleta-admin.onrender.com"
+];
 
 setInterval(() => {
-    location.reload();
-}, 30000);
+    const linkAleatorio = links[Math.floor(Math.random() * links.length)];
+    console.log("Abrindo:", linkAleatorio);
+    window.location.href = linkAleatorio;
+}, 10 * 60 * 1000); // 10 minutos
   
 </script>
 </body>

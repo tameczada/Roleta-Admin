@@ -14,6 +14,7 @@ const DEFAULT_STATE = {
     autoRemoverVencedor: false,
     autoOcultarPainel: true,
     temaAutoRotar: true,
+    vencedorForcado: "",   // nome que deve ganhar no próximo giro (vazio = sorteio aleatório normal)
   },
 
   sons: {

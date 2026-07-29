@@ -11,13 +11,25 @@ router.get("/", (req, res) => {
 
 router.patch("/", requireAuth, (req, res) => {
   const allowed = ["titulo","channelName","tempoPadrao","modoCor","temaAtivo",
-                   "autoRemoverVencedor","autoOcultarPainel","temaAutoRotar"];
+                   "autoRemoverVencedor","autoOcultarPainel","temaAutoRotar","vencedorForcado"];
   const patch = {};
   for (const key of allowed) { if (key in req.body) patch[key] = req.body[key]; }
   if (!Object.keys(patch).length)
     return res.status(400).json({ ok: false, error: "Nenhum campo válido enviado." });
   const updated = store.patch("config", patch);
   emit("config", updated);  // push em tempo real para a roleta
+  res.json({ ok: true, data: updated });
+});
+
+/**
+ * POST /api/config/consumir-vencedor
+ * Zera o campo "vencedorForcado" depois que a roleta já usou (giro concluído).
+ * Sem auth de propósito: só permite LIMPAR o campo (nunca definir um novo vencedor),
+ * então a própria roleta pública pode chamar isso ao terminar o giro rigado.
+ */
+router.post("/consumir-vencedor", (req, res) => {
+  const updated = store.patch("config", { vencedorForcado: "" });
+  emit("config", updated);
   res.json({ ok: true, data: updated });
 });
 

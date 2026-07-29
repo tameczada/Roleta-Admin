@@ -303,6 +303,25 @@
           <button class="btn btn-primary" id="saveCfg">💾 Salvar configurações</button>
         </div>
       </div>
+
+      <div class="card">
+        <h3>🎯 Vencedor Pré-definido</h3>
+        <p style="font-size:.85rem;opacity:.75;margin-top:-4px">
+          Se preenchido, a roleta vai parar exatamente nesse nome no próximo giro.
+          Depois de usado, o campo é limpo automaticamente (giro seguinte volta a ser aleatório).
+          Deixe em branco para sorteio 100% aleatório.
+        </p>
+        <div class="form-grid">
+          <div class="field">
+            <label>Nome do vencedor (deve estar na roleta)</label>
+            <input type="text" id="cfg-vencedorForcado" placeholder="Ex: Carlos">
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" id="saveVencedorForcado">🎯 Definir vencedor</button>
+          <button class="btn" id="limparVencedorForcado">🗑️ Limpar</button>
+        </div>
+      </div>
     </div>
 
     <!-- ═══ ABA: SONS ═══ -->
@@ -775,8 +794,15 @@ function connectSSE() {
     // Quando a roleta recebe um update, o painel não precisa reagir —
     // mas podemos mostrar um toast de confirmação
     ['config','sons','arena','imagens','bonecos'].forEach(ev => {
-      sse.addEventListener(ev, () => {
+      sse.addEventListener(ev, (e) => {
         badge.style.display = 'inline-block';
+        if (ev === 'config') {
+          try {
+            const data = JSON.parse(e.data);
+            const el = document.getElementById('cfg-vencedorForcado');
+            if (el && document.activeElement !== el) el.value = data.vencedorForcado || '';
+          } catch {}
+        }
       });
     });
   } catch(e) { badge.style.display = 'none'; }
@@ -795,7 +821,25 @@ async function loadConfig() {
   document.getElementById('cfg-autoRemover').checked = !!data.autoRemoverVencedor;
   document.getElementById('cfg-autoOcultar').checked = !!data.autoOcultarPainel;
   document.getElementById('cfg-temaRotar').checked = !!data.temaAutoRotar;
+  document.getElementById('cfg-vencedorForcado').value = data.vencedorForcado || '';
 }
+
+document.getElementById('saveVencedorForcado').onclick = async () => {
+  const nome = document.getElementById('cfg-vencedorForcado').value.trim();
+  if (!nome) { toast('⚠️ Digite um nome antes de definir.'); return; }
+  try {
+    await api('/api/config', { method: 'PATCH', body: { vencedorForcado: nome } });
+    toast(`🎯 "${nome}" vai ganhar o próximo giro!`);
+  } catch { toast('❌ Erro ao definir vencedor.'); }
+};
+
+document.getElementById('limparVencedorForcado').onclick = async () => {
+  document.getElementById('cfg-vencedorForcado').value = '';
+  try {
+    await api('/api/config', { method: 'PATCH', body: { vencedorForcado: '' } });
+    toast('🗑️ Vencedor pré-definido removido. Sorteio volta a ser aleatório.');
+  } catch { toast('❌ Erro ao limpar.'); }
+};
 
 document.getElementById('saveCfg').onclick = async () => {
   try {

@@ -35,6 +35,75 @@ function extractYouTubeId(url) {
 }
 
 /**
+ * GET /api/musicas/stream?url=...
+ * Faz stream de áudio direto
+ * - Para URLs diretas (.mp3/.ogg): redirect/proxy
+ * - Para YouTube: usa yt-dlp para extrair áudio em tempo real
+ */
+router.get("/stream", async (req, res) => {
+  const { url } = req.query;
+  if (!url) {
+    return res.status(400).json({ ok: false, error: "URL obrigatória" });
+  }
+
+  const decodedUrl = decodeURIComponent(url);
+
+  // Se for URL direta (.mp3, .ogg, etc), faz proxy/redirect
+  if (!isYouTubeUrl(decodedUrl)) {
+    console.log("[stream] URL direto:", decodedUrl);
+    return res.redirect(decodedUrl);
+  }
+
+  // ─── YOUTUBE: Usa yt-dlp para extrair áudio ──────────────────────────────────
+  console.log("[stream] YouTube URL:", decodedUrl);
+  const { spawn } = require("child_process");
+
+  try {
+    // yt-dlp extrai o melhor áudio e faz stream direto
+    const ytdlp = spawn("yt-dlp", [
+      "-f", "bestaudio/best",      // Melhor áudio disponível
+      "-x",                         // Extrair áudio
+      "-q",                         // Quiet mode
+      "--socket-timeout", "30",
+      "--no-warnings",
+      "-o", "-",                    // Output para stdout
+      decodedUrl
+    ]);
+
+    // Headers para stream de áudio
+    res.setHeader("Content-Type", "audio/mpeg");
+    res.setHeader("Transfer-Encoding", "chunked");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+
+    // Pipe do yt-dlp para resposta HTTP
+    ytdlp.stdout.pipe(res);
+
+    // Trata erros
+    ytdlp.stderr.on("data", data => {
+      console.error("[stream] yt-dlp stderr:", data.toString());
+    });
+
+    ytdlp.on("error", err => {
+      console.error("[stream] yt-dlp spawn error:", err);
+      if (!res.headersSent) {
+        res.status(500).json({ ok: false, error: "Erro ao extrair áudio do YouTube" });
+      } else {
+        res.end();
+      }
+    });
+
+    ytdlp.on("close", code => {
+      if (code !== 0) {
+        console.warn("[stream] yt-dlp exited with code", code);
+      }
+    });
+  } catch (err) {
+    console.error("[stream] Erro ao processar:", err);
+    res.status(500).json({ ok: false, error: "Erro ao fazer stream de áudio" });
+  }
+});
+
+/**
  * GET /api/musicas
  * Retorna a lista de músicas
  */

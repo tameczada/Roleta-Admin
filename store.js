@@ -74,6 +74,11 @@ const DEFAULT_STATE = {
     ticketsMax: 20,
   },
 
+  // Gerenciador de músicas — URLs direto (.mp3/.ogg) ou YouTube
+  musicas: [
+    // { id, nome, url, tipo: "direto" | "youtube" }
+  ],
+
   // Participantes importados via CSV
   participantes: [],
 

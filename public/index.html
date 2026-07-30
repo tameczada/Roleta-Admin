@@ -240,6 +240,7 @@
   <nav class="tabs">
     <button class="active" data-tab="config">⚙️ Geral</button>
     <button data-tab="sons">🎵 Sons</button>
+    <button data-tab="musicas">🎶 Músicas</button>
     <button data-tab="arena">🐾 Arena</button>
     <button data-tab="visual">🎨 Visual</button>
     <button data-tab="imagens">🖼️ Imagens</button>
@@ -352,6 +353,36 @@
         </div>
         <div class="actions">
           <button class="btn btn-primary" id="saveSons">💾 Salvar sons</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ ABA: MÚSICAS ═══ -->
+    <div class="tab-panel" id="tab-musicas">
+      <div class="card">
+        <h3>🎶 Gerenciador de Músicas</h3>
+        <p style="font-size:.85rem;opacity:.75;margin-top:-4px">
+          Adicione URLs diretos (.mp3, .ogg) ou links do YouTube. O sistema detecta automaticamente.
+        </p>
+        <div class="form-grid">
+          <div class="field">
+            <label>Nome da música</label>
+            <input type="text" id="mus-nome" placeholder="Ex: Música Épica">
+          </div>
+          <div class="field">
+            <label>URL (direto .mp3/.ogg ou YouTube)</label>
+            <input type="url" id="mus-url" placeholder="https://... ou https://youtube.com/watch?v=...">
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" id="saveMusicaBtn">➕ Adicionar Música</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>🎵 Suas Músicas</h3>
+        <div id="musicasList" style="max-height: 400px; overflow-y: auto;">
+          <p style="text-align: center; color: #999;">Carregando...</p>
         </div>
       </div>
     </div>
@@ -778,7 +809,7 @@ document.querySelectorAll('nav.tabs button').forEach(btn => {
 // INIT — carrega todas as seções
 // ──────────────────────────────────────────────────────────────────────────────
 async function init() {
-  await Promise.all([loadConfig(), loadSons(), loadArena(), loadVisual(), loadFilmes()]);
+  await Promise.all([loadConfig(), loadSons(), loadMusicas(), loadArena(), loadVisual(), loadFilmes()]);
   connectSSE();
 }
 
@@ -793,7 +824,7 @@ function connectSSE() {
     sse.onerror = () => { badge.style.display = 'none'; setTimeout(connectSSE, 5000); sse.close(); };
     // Quando a roleta recebe um update, o painel não precisa reagir —
     // mas podemos mostrar um toast de confirmação
-    ['config','sons','arena','imagens','bonecos'].forEach(ev => {
+    ['config','sons','musicas','arena','imagens','bonecos'].forEach(ev => {
       sse.addEventListener(ev, (e) => {
         badge.style.display = 'inline-block';
         if (ev === 'config') {
@@ -863,20 +894,25 @@ document.getElementById('saveCfg').onclick = async () => {
 // ──────────────────────────────────────────────────────────────────────────────
 // ABA SONS
 // ──────────────────────────────────────────────────────────────────────────────
-const MUSICAS_NAMES = [
-  'Silvio Santos (padrão)','Sou humano (gospel)','Como zaquel (gospel)',
-  'Noites traiçoeiras (gospel)','Ragatanga','We Are the Champions',
-  'Rock Balboa','Rock Balboa 2','PSY – Gangnam Style','Roleta Vira e Volta',
-  'Missão Impossível','Quem é esse? (gospel)','Tango balango',
-  'Jesus Cristo (gospel)','Butterfly','Uni Duni Tê','No Baile Nois é Mídia',
-  'Música padrão de sorteio',
-];
+// Antes usava um array hardcoded de nomes de músicas.
+// Agora carrega dinâmico do backend via applyMusicas()
 
 async function loadSons() {
   const { data } = await api('/api/sons');
   const sel = document.getElementById('son-musica');
-  sel.innerHTML = MUSICAS_NAMES.map((n, i) => `<option value="${i}">${i} – ${n}</option>`).join('');
-  sel.value = data.musicaSelecionada;
+  
+  // Carrega as músicas que vêm do admin (via admin-sync)
+  const musicas = adminGetMusicas() || [];
+  
+  if (musicas.length > 0) {
+    sel.innerHTML = musicas.map((m, i) => 
+      `<option value="${i}">${m.nome} ${m.tipo === 'youtube' ? '(YT)' : '(URL)'}</option>`
+    ).join('');
+  } else {
+    sel.innerHTML = '<option value="0">Nenhuma música adicionada</option>';
+  }
+  
+  sel.value = Math.min(data.musicaSelecionada, musicas.length - 1);
   const vm = document.getElementById('son-volMusica');
   vm.value = data.volumeMusica;
   document.getElementById('lbl-volMusica').textContent = Math.round(data.volumeMusica * 100) + '%';
@@ -903,6 +939,74 @@ document.getElementById('saveSons').onclick = async () => {
       }
     });
     toast('✅ Sons salvos!');
+  } catch (e) { toast('❌ ' + e.message, 'err'); }
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
+// ABA MÚSICAS
+// ──────────────────────────────────────────────────────────────────────────────
+async function loadMusicas() {
+  const { data } = await api('/api/musicas');
+  renderMusicasList(data);
+}
+
+function renderMusicasList(musicas) {
+  const container = document.getElementById('musicasList');
+  if (!musicas || musicas.length === 0) {
+    container.innerHTML = '<p style="text-align: center; color: #999;">Nenhuma música adicionada ainda.</p>';
+    return;
+  }
+  container.innerHTML = musicas.map(m => `
+    <div style="
+      padding: 12px;
+      margin-bottom: 8px;
+      background: #f9f9f9;
+      border-radius: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-left: 4px solid ${m.tipo === 'youtube' ? '#ff0000' : '#0066cc'};
+    ">
+      <div style="flex: 1;">
+        <strong>${m.nome}</strong>
+        <div style="font-size: 0.75rem; color: #999; margin-top: 2px;">
+          ${m.tipo === 'youtube' ? '▶️ YouTube' : '🔗 URL direto'} • ${m.url.substring(0, 50)}...
+        </div>
+      </div>
+      <div style="margin-left: 12px;">
+        <button class="btn" onclick="deletarMusica('${m.id}')">🗑️ Deletar</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function deletarMusica(id) {
+  if (!confirm('Tem certeza que quer deletar essa música?')) return;
+  try {
+    await api(`/api/musicas/${id}`, { method: 'DELETE' });
+    toast('✅ Música deletada!');
+    loadMusicas();
+  } catch (e) { toast('❌ ' + e.message, 'err'); }
+}
+
+document.getElementById('saveMusicaBtn').onclick = async () => {
+  const nome = document.getElementById('mus-nome').value.trim();
+  const url = document.getElementById('mus-url').value.trim();
+
+  if (!nome || !url) {
+    toast('⚠️ Preencha nome e URL', 'warn');
+    return;
+  }
+
+  try {
+    await api('/api/musicas', {
+      method: 'POST',
+      body: { nome, url }
+    });
+    toast('✅ Música adicionada!');
+    document.getElementById('mus-nome').value = '';
+    document.getElementById('mus-url').value = '';
+    loadMusicas();
   } catch (e) { toast('❌ ' + e.message, 'err'); }
 };
 

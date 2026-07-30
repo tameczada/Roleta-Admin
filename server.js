@@ -43,6 +43,7 @@ app.use("/api/arena",     require("./routes/arena"));
 app.use("/api/visual",    require("./routes/visual"));
 app.use("/api/imagens",   require("./routes/imagens"));
 app.use("/api/filmes",    require("./routes/filmes"));
+app.use("/api/musicas",   require("./routes/musicas"));
 app.use("/api/estado",    require("./routes/estado"));
 app.use("/api/historico",      require("./routes/historico"));
 app.use("/api/participantes", require("./routes/participantes"));

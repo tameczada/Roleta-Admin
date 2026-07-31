@@ -10,7 +10,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: ADMIN_SECRET
-        generateValue: true
+        generateValue: true   # Render gera automaticamente — copie depois em Dashboard > Environment
       - key: FRONTEND_URL
         value: https://luyan-tamec.github.io/roleta-leoeisa
       - key: BACKEND_URL

@@ -13,6 +13,10 @@ require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const supabase = require("../supabase/client");
+if (!supabase) {
+  console.error("Defina SUPABASE_URL e SUPABASE_SERVICE_KEY no .env antes de migrar.");
+  process.exit(1);
+}
 
 const ROOT        = path.join(__dirname, "..");
 const DATA_FILE   = path.join(ROOT, "data.json");

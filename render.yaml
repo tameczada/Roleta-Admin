@@ -22,3 +22,5 @@ services:
         sync: false   # cole manualmente no Dashboard > Environment (Project Settings > API do Supabase)
       - key: SUPABASE_SERVICE_KEY
         sync: false   # cole a service_role key manualmente — nunca commitar isso
+      - key: YOUTUBE_API_KEY
+        sync: false   # chave da YouTube Data API v3 (busca do menu YouTube da roleta) — só no servidor

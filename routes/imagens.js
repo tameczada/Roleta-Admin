@@ -9,7 +9,11 @@ const { v4: uuidv4 } = require("uuid");
 const store   = require("../store");
 const supabase = require("../supabase/client");
 const { requireAuth } = require("../middleware/auth");
+const wrap = require("../middleware/asyncHandler");
+const exigirSupabase = require("../middleware/needSupabase");
 const { emit } = require("./events");
+
+router.use(exigirSupabase); // 503 claro se o Supabase não estiver configurado
 
 const BUCKET_BONECOS  = "bonecos";
 const BUCKET_ESTATICAS = "imagens-estaticas";
@@ -39,22 +43,29 @@ async function ensureBuckets() {
     }
   }
 }
-ensureBuckets();
+if (supabase) ensureBuckets();
+
+// Só formatos raster conhecidos. A extensão vem do tipo MIME validado (não do nome
+// enviado pelo cliente), para não gravar ".html"/".svg" em bucket público.
+const EXT_POR_MIME = { "image/png": ".png", "image/jpeg": ".jpg", "image/gif": ".gif", "image/webp": ".webp" };
+const imagemFilter = (req, file, cb) => {
+  if (!EXT_POR_MIME[file.mimetype]) return cb(new Error("Apenas imagens PNG, JPG, GIF ou WEBP."));
+  cb(null, true);
+};
 
 // ── Multer em memória (o buffer vai direto para o Supabase Storage) ─────────
 const uploadBoneco = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (!file.mimetype.startsWith("image/")) return cb(new Error("Apenas imagens."));
-    cb(null, true);
-  },
+  fileFilter: imagemFilter,
 });
+// Imagens estáticas (centro, fundos, favicon) também aceitam SVG.
+const EXT_ESTATICAS = { ...EXT_POR_MIME, "image/svg+xml": ".svg" };
 const uploadImg = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    if (!file.mimetype.startsWith("image/")) return cb(new Error("Apenas imagens."));
+    if (!EXT_ESTATICAS[file.mimetype]) return cb(new Error("Apenas imagens PNG, JPG, GIF, WEBP ou SVG."));
     cb(null, true);
   },
 });
@@ -75,19 +86,19 @@ function buildSlotsResponse() {
 
 // ═══ BONECOS ═════════════════════════════════════════════════════════════════
 
-router.get("/bonecos", async (req, res) => {
+router.get("/bonecos", wrap(async (req, res) => {
   const { data, error } = await supabase.storage.from(BUCKET_BONECOS).list("", { limit: 1000 });
   if (error) return res.status(502).json({ ok: false, error: error.message });
   const files = (data || []).filter(f => /\.(png|jpg|jpeg|gif|webp)$/i.test(f.name));
   res.json({ ok: true, data: files.map(f => ({ filename: f.name, url: publicUrl(BUCKET_BONECOS, f.name) })) });
-});
+}));
 
-router.post("/bonecos", requireAuth, uploadBoneco.array("files", 20), async (req, res) => {
+router.post("/bonecos", requireAuth, uploadBoneco.array("files", 20), wrap(async (req, res) => {
   if (!req.files?.length) return res.status(400).json({ ok: false, error: "Nenhum arquivo enviado." });
 
   const uploaded = [];
   for (const file of req.files) {
-    const filename = `${uuidv4()}${path.extname(file.originalname) || ".png"}`;
+    const filename = `${uuidv4()}${EXT_POR_MIME[file.mimetype]}`;
     const { error } = await supabase.storage
       .from(BUCKET_BONECOS)
       .upload(filename, file.buffer, { contentType: file.mimetype });
@@ -102,9 +113,9 @@ router.post("/bonecos", requireAuth, uploadBoneco.array("files", 20), async (req
   const allUrls = all.map(f => ({ filename: f, url: publicUrl(BUCKET_BONECOS, f) }));
   emit("bonecos", allUrls);
   res.json({ ok: true, uploaded });
-});
+}));
 
-router.delete("/bonecos/:filename", requireAuth, async (req, res) => {
+router.delete("/bonecos/:filename", requireAuth, wrap(async (req, res) => {
   const filename = path.basename(req.params.filename);
   const { error } = await supabase.storage.from(BUCKET_BONECOS).remove([filename]);
   if (error) return res.status(502).json({ ok: false, error: error.message });
@@ -116,7 +127,7 @@ router.delete("/bonecos/:filename", requireAuth, async (req, res) => {
   const remainingUrls = remaining.map(f => ({ filename: f, url: publicUrl(BUCKET_BONECOS, f) }));
   emit("bonecos", remainingUrls);
   res.json({ ok: true, deleted: filename, remaining });
-});
+}));
 
 // ═══ IMAGENS ESTÁTICAS ═══════════════════════════════════════════════════════
 
@@ -132,24 +143,30 @@ router.post("/estaticas/:slot",
     next();
   },
   uploadImg.single("file"),
-  async (req, res) => {
+  wrap(async (req, res) => {
     if (!req.file) return res.status(400).json({ ok: false, error: "Nenhum arquivo enviado." });
     const slot = req.params.slot;
-    const filename = `${slot}${path.extname(req.file.originalname) || ".png"}`;
+    const filename = `${slot}${EXT_ESTATICAS[req.file.mimetype]}`;
 
     const { error } = await supabase.storage
       .from(BUCKET_ESTATICAS)
       .upload(filename, req.file.buffer, { contentType: req.file.mimetype, upsert: true });
     if (error) return res.status(502).json({ ok: false, error: error.message });
 
+    // Se o slot já tinha um arquivo com outra extensão (ex.: centro.png → centro.jpg), remove o antigo.
+    const anterior = store.get().imagens[slot];
+    if (anterior && anterior !== filename) {
+      await supabase.storage.from(BUCKET_ESTATICAS).remove([anterior]).catch(() => {});
+    }
+
     store.patch("imagens", { [slot]: filename });
     const slots = buildSlotsResponse();
     emit("imagens", slots);  // push todos os slots atualizados
     res.json({ ok: true, slot, filename, url: publicUrl(BUCKET_ESTATICAS, filename) });
-  }
+  })
 );
 
-router.delete("/estaticas/:slot", requireAuth, async (req, res) => {
+router.delete("/estaticas/:slot", requireAuth, wrap(async (req, res) => {
   const slot = req.params.slot;
   if (!STATIC_SLOTS.includes(slot)) return res.status(400).json({ ok: false, error: "Slot inválido." });
   const current = store.get().imagens[slot];
@@ -161,10 +178,12 @@ router.delete("/estaticas/:slot", requireAuth, async (req, res) => {
   const slots = buildSlotsResponse();
   emit("imagens", slots);
   res.json({ ok: true, slot, reset: true });
-});
+}));
 
 router.use((err, req, res, _next) => {
-  res.status(400).json({ ok: false, error: err.message });
+  const erroDeUpload = err instanceof multer.MulterError || /^Apenas imagens/.test(err.message);
+  if (!erroDeUpload) console.error("[imagens]", err);
+  res.status(erroDeUpload ? 400 : 500).json({ ok: false, error: erroDeUpload ? err.message : "Erro interno." });
 });
 
 module.exports = router;

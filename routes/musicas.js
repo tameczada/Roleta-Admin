@@ -9,7 +9,12 @@ const { v4: uuidv4 } = require("uuid");
 const store   = require("../store");
 const supabase = require("../supabase/client");
 const { requireAuth } = require("../middleware/auth");
+const wrap = require("../middleware/asyncHandler");
+const exigirSupabase = require("../middleware/needSupabase");
+const { limparTexto } = require("../utils/sanitize");
 const { emit } = require("./events");
+
+router.use(exigirSupabase); // 503 claro se o Supabase não estiver configurado
 
 const BUCKET = "musicas";
 
@@ -28,7 +33,7 @@ async function ensureBucket() {
     console.error(`[musicas] Não foi possível garantir o bucket "${BUCKET}":`, e.message);
   }
 }
-ensureBucket();
+if (supabase) ensureBucket();
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -69,7 +74,7 @@ router.get("/", (req, res) => {
 // POST /api/musicas — upload de uma ou mais faixas (multipart, campo "files")
 // Nomes customizados (opcional): campo "nomes" com um array JSON na mesma
 // ordem dos arquivos, ex: '["Intro","Vitória"]'. Sem isso, usa o nome do arquivo.
-router.post("/", requireAuth, upload.array("files", 20), async (req, res) => {
+router.post("/", requireAuth, upload.array("files", 20), wrap(async (req, res) => {
   if (!req.files?.length) return res.status(400).json({ ok: false, error: "Nenhum arquivo enviado." });
 
   let nomesCustom = [];
@@ -80,12 +85,13 @@ router.post("/", requireAuth, upload.array("files", 20), async (req, res) => {
   const novas = [];
   for (let i = 0; i < req.files.length; i++) {
     const file = req.files[i];
-    const filename = `${uuidv4()}${path.extname(file.originalname) || ".mp3"}`;
+    const ext = path.extname(file.originalname).toLowerCase().replace(/[^.a-z0-9]/g, "").slice(0, 6);
+    const filename = `${uuidv4()}${ext || ".mp3"}`;
     const { error } = await supabase.storage
       .from(BUCKET)
       .upload(filename, file.buffer, { contentType: file.mimetype });
     if (error) return res.status(502).json({ ok: false, error: `Falha ao enviar ${file.originalname}: ${error.message}` });
-    const nome = (nomesCustom[i] && String(nomesCustom[i]).trim()) || nomeSemExtensao(file.originalname);
+    const nome = limparTexto(nomesCustom[i], 100) || limparTexto(nomeSemExtensao(file.originalname), 100);
     novas.push({ id: uuidv4(), nome, filename });
   }
 
@@ -99,18 +105,18 @@ router.post("/", requireAuth, upload.array("files", 20), async (req, res) => {
   const data = state.playlist.map(t => ({ ...t, url: publicUrl(t.filename) }));
   emit("playlist", data);
   res.json({ ok: true, uploaded: novas.map(t => ({ ...t, url: publicUrl(t.filename) })), data });
-});
+}));
 
 // PATCH /api/musicas/:id — renomeia uma faixa
 router.patch("/:id", requireAuth, (req, res) => {
-  const { nome } = req.body;
-  if (!nome || !String(nome).trim()) return res.status(400).json({ ok: false, error: "nome obrigatório." });
+  const nome = limparTexto(req.body?.nome, 100);
+  if (!nome) return res.status(400).json({ ok: false, error: "nome obrigatório." });
 
   const state = store.get();
   const faixa = (state.playlist || []).find(t => t.id === req.params.id);
   if (!faixa) return res.status(404).json({ ok: false, error: "Faixa não encontrada." });
 
-  faixa.nome = String(nome).trim();
+  faixa.nome = nome;
   state.playlist = dedupePlaylist(state.playlist);
   store.set(state);
 
@@ -120,7 +126,7 @@ router.patch("/:id", requireAuth, (req, res) => {
 });
 
 // DELETE /api/musicas/:id — remove uma faixa (storage + estado)
-router.delete("/:id", requireAuth, async (req, res) => {
+router.delete("/:id", requireAuth, wrap(async (req, res) => {
   const state = store.get();
   const playlist = state.playlist || [];
   const faixa = playlist.find(t => t.id === req.params.id);
@@ -135,10 +141,12 @@ router.delete("/:id", requireAuth, async (req, res) => {
   const data = state.playlist.map(t => ({ ...t, url: publicUrl(t.filename) }));
   emit("playlist", data);
   res.json({ ok: true, deleted: faixa.id, data });
-});
+}));
 
 router.use((err, req, res, _next) => {
-  res.status(400).json({ ok: false, error: err.message });
+  const erroDeUpload = err instanceof multer.MulterError || /^Apenas arquivos de áudio/.test(err.message);
+  if (!erroDeUpload) console.error("[musicas]", err);
+  res.status(erroDeUpload ? 400 : 500).json({ ok: false, error: erroDeUpload ? err.message : "Erro interno." });
 });
 
 module.exports = router;

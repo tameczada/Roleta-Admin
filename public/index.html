@@ -708,14 +708,6 @@
 let API = '';
 let SECRET = '';
 
-// Escapa texto antes de interpolar em innerHTML / atributos. Todo dado que vem do
-// servidor (nomes de participantes, histórico, faixas, arquivos, mensagens de erro)
-// passa por aqui — o histórico é preenchido por um endpoint público, então um nome
-// malicioso não pode virar HTML/JS dentro do painel (onde fica a chave de admin).
-function esc(v) {
-  return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-
 // ──────────────────────────────────────────────────────────────────────────────
 // UTILS
 // ──────────────────────────────────────────────────────────────────────────────
@@ -755,10 +747,9 @@ async function doLogin(url, secret) {
   secret = secret.trim();
   if (!url || !secret) return;
   try {
-    const res = await fetch(`${url}/api/auth/check`, {
+    const res = await fetch(`${url}/api/config`, {
       headers: { Authorization: `Bearer ${secret}` }
     });
-    if (res.status === 429) throw new Error('Muitas tentativas. Aguarde alguns minutos.');
     if (!res.ok) throw new Error('Não autorizado');
     // Seta globais ANTES de qualquer outra coisa
     API = url;
@@ -769,10 +760,8 @@ async function doLogin(url, secret) {
     document.getElementById('app').classList.add('visible');
     document.getElementById('headerUrl').textContent = API;
     init();
-  } catch (e) {
-    const err = document.getElementById('loginErr');
-    err.textContent = /tentativas/.test(e.message) ? e.message : 'Chave incorreta ou backend inacessível.';
-    err.style.display = 'block';
+  } catch {
+    document.getElementById('loginErr').style.display = 'block';
   }
 }
 
@@ -984,7 +973,7 @@ function renderSelectedMusicas() {
     return `
       <div class="check-row" style="gap:8px">
         <span style="min-width:20px">🎵</span>
-        <input type="text" class="musica-nome-input" data-idx="${i}" value="${esc(nomePadrao)}" placeholder="Nome da faixa" style="flex:1">
+        <input type="text" class="musica-nome-input" data-idx="${i}" value="${nomePadrao.replace(/"/g, '&quot;')}" placeholder="Nome da faixa" style="flex:1">
       </div>`;
   }).join('');
 }
@@ -998,19 +987,38 @@ document.getElementById('uploadMusicas').onclick = async () => {
   const fd = new FormData();
   [...files].forEach(f => fd.append('files', f));
   fd.append('nomes', JSON.stringify(nomes));
+
+  const btn = document.getElementById('uploadMusicas');
+  const textoOriginal = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = `⏳ Enviando ${files.length} arquivo(s)...`;
   try {
     const res = await fetch(`${API}/api/musicas`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${SECRET}` },
       body: fd,
     }).then(r => r.json());
-    if (!res.ok) throw new Error(res.error);
-    toast(`✅ ${res.uploaded.length} música(s) enviada(s)!`);
+
+    // O backend envia cada faixa de forma independente: uma falha isolada
+    // (rede/Supabase) não derruba as demais, então pode vir sucesso parcial.
+    const falhas = res.falhas || [];
+    if (!res.uploaded?.length && falhas.length) throw new Error(falhas.join(' | '));
+
+    if (falhas.length) {
+      toast(`⚠️ ${res.uploaded.length} enviada(s), ${falhas.length} falhou/falharam: ${falhas.join(' | ')}`, 'err');
+    } else {
+      toast(`✅ ${res.uploaded.length} música(s) enviada(s)!`);
+    }
     musicasInput.value = '';
     renderSelectedMusicas();
     loadPlaylist();
     loadSons();
-  } catch (e) { toast('❌ ' + e.message, 'err'); }
+  } catch (e) {
+    toast('❌ ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = textoOriginal;
+  }
 };
 
 document.getElementById('refreshMusicas').onclick = loadPlaylist;
@@ -1023,14 +1031,14 @@ async function loadPlaylist() {
     if (!data.length) { list.innerHTML = '<div class="info">Nenhuma música na playlist ainda.</div>'; return; }
     list.innerHTML = data.map(t => `
       <div class="check-row" style="justify-content:space-between">
-        <span>🎵 ${esc(t.nome)}</span>
+        <span>🎵 ${t.nome}</span>
         <span>
-          <button class="btn btn-ghost btn-sm" data-id="${esc(t.id)}" data-nome="${esc(t.nome)}" onclick="renomearFaixa(this.dataset.id, this.dataset.nome)">✏️</button>
-          <button class="btn btn-ghost btn-sm" data-id="${esc(t.id)}" onclick="deletarFaixa(this.dataset.id)" style="color:var(--danger)">🗑️</button>
+          <button class="btn btn-ghost btn-sm" onclick="renomearFaixa('${t.id}','${t.nome.replace(/'/g, "\\'")}')">✏️</button>
+          <button class="btn btn-ghost btn-sm" onclick="deletarFaixa('${t.id}')" style="color:var(--danger)">🗑️</button>
         </span>
       </div>
     `).join('');
-  } catch (e) { list.innerHTML = `<div class="info" style="color:var(--danger)">${esc(e.message)}</div>`; }
+  } catch (e) { list.innerHTML = `<div class="info" style="color:var(--danger)">${e.message}</div>`; }
 }
 
 async function renomearFaixa(id, nomeAtual) {
@@ -1102,8 +1110,8 @@ function renderPaleta(cores) {
   const el = document.getElementById('ar-paletaSwatches');
   el.innerHTML = _paleta.map((c, i) => `
     <div style="display:flex;align-items:center;gap:4px">
-      <div style="width:28px;height:28px;border-radius:6px;background:${esc(c)};border:1px solid var(--border)"></div>
-      <span style="font-size:.8rem;font-family:monospace">${esc(c)}</span>
+      <div style="width:28px;height:28px;border-radius:6px;background:${c};border:1px solid var(--border)"></div>
+      <span style="font-size:.8rem;font-family:monospace">${c}</span>
       <button onclick="removeCor(${i})" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:.9rem">×</button>
     </div>
   `).join('') || '<span class="info">Nenhuma cor — usando paleta interna</span>';
@@ -1232,13 +1240,13 @@ async function loadHistorico() {
       <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
         <span style="font-size:1.1rem;font-weight:700;color:var(--accent);min-width:28px">#${i+1}</span>
         <div style="flex:1">
-          <div style="font-weight:700">${esc(v.nome)}</div>
-          ${v.item ? `<div style="font-size:.8rem;color:var(--muted)">${esc(v.item)}</div>` : ''}
+          <div style="font-weight:700">${v.nome}</div>
+          ${v.item ? `<div style="font-size:.8rem;color:var(--muted)">${v.item}</div>` : ''}
         </div>
         <div style="font-size:.75rem;color:var(--muted)">${new Date(v.timestamp).toLocaleString('pt-BR')}</div>
       </div>
     `).join('');
-  } catch (e) { el.innerHTML = `<div class="info" style="color:var(--danger)">${esc(e.message)}</div>`; }
+  } catch (e) { el.innerHTML = `<div class="info" style="color:var(--danger)">${e.message}</div>`; }
 }
 
 document.getElementById('refreshHistorico').onclick = loadHistorico;
@@ -1268,7 +1276,7 @@ async function loadStaticSlots() {
   grid.innerHTML = Object.keys(SLOT_LABELS).map(slot => `
     <div class="slot-card" id="slot-${slot}">
       <div class="slot-name">${SLOT_LABELS[slot]}</div>
-      <img src="${data[slot] ? esc(data[slot]) : 'data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\'><rect width=\'100%\' height=\'100%\' fill=\'%231e1e2e\'/><text x=\'50%\' y=\'50%\' dominant-baseline=\'middle\' text-anchor=\'middle\' fill=\'%23888\' font-size=\'12\'>original</text></svg>'}"
+      <img src="${data[slot] || 'data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\'><rect width=\'100%\' height=\'100%\' fill=\'%231e1e2e\'/><text x=\'50%\' y=\'50%\' dominant-baseline=\'middle\' text-anchor=\'middle\' fill=\'%23888\' font-size=\'12\'>original</text></svg>'}"
            alt="${slot}" onerror="this.style.display='none'">
       <div class="slot-actions">
         <label class="btn btn-ghost btn-sm" style="cursor:pointer">
@@ -1278,7 +1286,7 @@ async function loadStaticSlots() {
         </label>
         ${data[slot] ? `<button class="btn btn-danger btn-sm" onclick="deleteStaticSlot('${slot}')">🗑️</button>` : ''}
       </div>
-      ${data[slot] ? `<a href="${esc(data[slot])}" target="_blank" rel="noopener" class="info" style="font-size:.75rem">ver atual</a>` : '<span class="info" style="font-size:.75rem">usando original</span>'}
+      ${data[slot] ? `<a href="${data[slot]}" target="_blank" class="info" style="font-size:.75rem">ver atual</a>` : '<span class="info" style="font-size:.75rem">usando original</span>'}
     </div>
   `).join('');
 }
@@ -1337,17 +1345,35 @@ document.getElementById('uploadBonecos').onclick = async () => {
   if (!files.length) { toast('Selecione imagens primeiro.', 'err'); return; }
   const fd = new FormData();
   [...files].forEach(f => fd.append('files', f));
+
+  const btn = document.getElementById('uploadBonecos');
+  const textoOriginal = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = `⏳ Enviando ${files.length} arquivo(s)...`;
   try {
     const res = await fetch(`${API}/api/imagens/bonecos`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${SECRET}` },
       body: fd,
     }).then(r => r.json());
-    if (!res.ok) throw new Error(res.error);
-    toast(`✅ ${res.uploaded.length} boneco(s) enviado(s)!`);
+
+    const falhas = res.falhas || [];
+    if (!res.uploaded?.length && falhas.length) throw new Error(falhas.join(' | '));
+
+    if (falhas.length) {
+      toast(`⚠️ ${res.uploaded.length} enviado(s), ${falhas.length} falhou/falharam: ${falhas.join(' | ')}`, 'err');
+    } else {
+      toast(`✅ ${res.uploaded.length} boneco(s) enviado(s)!`);
+    }
     bonemosInput.value = '';
+    renderSelectedFiles();
     loadBonecos();
-  } catch (e) { toast('❌ ' + e.message, 'err'); }
+  } catch (e) {
+    toast('❌ ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = textoOriginal;
+  }
 };
 
 document.getElementById('refreshBonecos').onclick = loadBonecos;
@@ -1360,12 +1386,12 @@ async function loadBonecos() {
     if (!data.length) { grid.innerHTML = '<div class="info">Nenhum boneco cadastrado ainda.</div>'; return; }
     grid.innerHTML = data.map(b => `
       <div class="img-tile">
-        <img src="${esc(b.url)}" alt="${esc(b.filename)}" loading="lazy">
-        <div class="name">${esc(b.filename)}</div>
-        <button class="del-btn" title="Remover" data-f="${esc(b.filename)}" onclick="deleteBoneco(this.dataset.f)">×</button>
+        <img src="${b.url}" alt="${b.filename}" loading="lazy">
+        <div class="name">${b.filename}</div>
+        <button class="del-btn" title="Remover" onclick="deleteBoneco('${b.filename}')">×</button>
       </div>
     `).join('');
-  } catch (e) { grid.innerHTML = `<div class="info" style="color:var(--danger)">${esc(e.message)}</div>`; }
+  } catch (e) { grid.innerHTML = `<div class="info" style="color:var(--danger)">${e.message}</div>`; }
 }
 
 async function deleteBoneco(filename) {
@@ -1495,7 +1521,7 @@ function processCSV(file) {
     document.getElementById('csvInfo').textContent =
       `${_csvNomes.length} nome(s) encontrado(s) em "${file.name}"`;
     document.getElementById('csvLista').innerHTML =
-      _csvNomes.map(n => `<span style="display:block">${esc(n)}</span>`).join('');
+      _csvNomes.map(n => `<span style="display:block">${n}</span>`).join('');
     document.getElementById('csvPreview').style.display = 'block';
     document.getElementById('btnImportarCSV').disabled = _csvNomes.length === 0;
   };
@@ -1537,13 +1563,13 @@ async function loadParticipantes() {
     el.innerHTML = data.map(nome => `
       <div style="display:flex;align-items:center;gap:6px;background:var(--surface2);
         border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:.85rem">
-        <span style="flex:1">${esc(nome)}</span>
-        <button data-nome="${esc(nome)}" onclick="removeParticipante(this.dataset.nome)"
+        <span style="flex:1">${nome}</span>
+        <button onclick="removeParticipante('${nome.replace(/'/g,"\\'")}' )"
           style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:1rem;line-height:1">×</button>
       </div>
     `).join('');
   } catch (e) {
-    el.innerHTML = `<span class="info" style="color:var(--danger)">${esc(e.message)}</span>`;
+    el.innerHTML = `<span class="info" style="color:var(--danger)">${e.message}</span>`;
   }
 }
 

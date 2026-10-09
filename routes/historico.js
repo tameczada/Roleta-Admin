@@ -3,22 +3,18 @@ const express = require("express");
 const router  = express.Router();
 const store   = require("../store");
 const { requireAuth } = require("../middleware/auth");
-const { rateLimit } = require("../middleware/rateLimit");
-const { limparTexto } = require("../utils/sanitize");
 const { emit } = require("./events");
 
 // GET — lista histórico (público)
 router.get("/", (req, res) => {
-  res.json({ ok: true, data: store.get().historico || [] });
+  res.json({ ok: true, data: store.get().historico });
 });
 
-// POST — registra um vencedor (chamado pelo frontend da roleta, que é público e
-// por isso não usa token). Mitigações: limite por IP + texto sanitizado/limitado.
-router.post("/", rateLimit({ windowMs: 60_000, max: 10 }), (req, res) => {
-  const nome = limparTexto(req.body?.nome, 50);
-  const item = limparTexto(req.body?.item, 100);
+// POST — registra um vencedor (chamado pelo frontend da roleta)
+router.post("/", (req, res) => {
+  const { nome, item } = req.body;
   if (!nome) return res.status(400).json({ ok: false, error: "nome obrigatório." });
-  const entrada = { nome, item, timestamp: new Date().toISOString() };
+  const entrada = { nome, item: item || "", timestamp: new Date().toISOString() };
   const historico = store.pushHistorico(entrada);
   emit("historico", historico);
   res.json({ ok: true, data: entrada });

@@ -6,11 +6,7 @@ const express = require("express");
 const router  = express.Router();
 const store   = require("../store");
 const { requireAuth } = require("../middleware/auth");
-const { limparTexto } = require("../utils/sanitize");
 const { emit } = require("./events");
-
-const MAX_NOME = 50;
-const MAX_TOTAL = 5000;
 
 // GET /api/participantes — lista atual (público)
 router.get("/", (req, res) => {
@@ -20,22 +16,17 @@ router.get("/", (req, res) => {
 // POST /api/participantes — adiciona nomes (array JSON)
 // Body: { nomes: ["Nome1", "Nome2", ...] }
 router.post("/", requireAuth, (req, res) => {
-  const { nomes } = req.body || {};
+  const { nomes } = req.body;
   if (!Array.isArray(nomes) || !nomes.length)
     return res.status(400).json({ ok: false, error: "Envie { nomes: [...] }" });
 
   const state = store.get();
   const atuais = state.participantes || [];
-  // Adiciona sem duplicatas (case-insensitive), com texto limpo e limitado
+  // Adiciona sem duplicatas (case-insensitive)
   const set = new Set(atuais.map(n => n.toLowerCase()));
-  const novos = [];
-  for (const bruto of nomes) {
-    const n = limparTexto(bruto, MAX_NOME);
-    if (!n || set.has(n.toLowerCase())) continue;
-    if (atuais.length + novos.length >= MAX_TOTAL) break;
-    set.add(n.toLowerCase());
-    novos.push(n);
-  }
+  const novos = nomes
+    .map(n => String(n).trim())
+    .filter(n => n && !set.has(n.toLowerCase()));
 
   state.participantes = [...atuais, ...novos];
   store.set(state);
@@ -43,7 +34,7 @@ router.post("/", requireAuth, (req, res) => {
   res.json({ ok: true, adicionados: novos.length, total: state.participantes.length, data: state.participantes });
 });
 
-// DELETE /api/participantes/nome/:nome — remove um nome
+// DELETE /api/participantes/:nome — remove um nome
 router.delete("/nome/:nome", requireAuth, (req, res) => {
   const nome = decodeURIComponent(req.params.nome).trim();
   const state = store.get();

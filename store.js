@@ -1,23 +1,11 @@
 // store.js
 // Persistência do estado da roleta via Supabase (tabela roleta_estado, linha única id='main').
-// Mantém um cache em memória (_state) para leituras síncronas nas rotas e grava no
-// Supabase em segundo plano a cada mudança.
-//
-// Proteções (v3.1):
-//  - Se o estado NÃO foi lido do banco (Supabase fora do ar / mal configurado), o store
-//    entra em modo degradado: continua funcionando em memória, mas NÃO grava — antes,
-//    o próximo save sobrescrevia o estado real do banco com os valores padrão.
-//    Ele tenta recarregar do banco a cada 30 s.
-//  - Gravações são serializadas/coalescidas (uma por vez, sempre com o estado mais novo),
-//    evitando que dois upserts concorrentes terminem fora de ordem.
-//  - set() sempre completa as seções faltantes com os padrões, então nenhuma rota
-//    consegue "apagar" seções inteiras (visual, participantes, playlist, historico).
+// Mantém um cache em memória (_state) para leituras síncronas nas rotas — igual ao
+// comportamento antigo baseado em data.json — e grava no Supabase em segundo plano
+// a cada mudança.
 const supabase = require("./supabase/client");
 
 const ROW_ID = "main";
-const RETRY_MS = 30_000;
-
-const clone = (o) => JSON.parse(JSON.stringify(o));
 
 const DEFAULT_STATE = {
   config: {
@@ -101,125 +89,80 @@ const DEFAULT_STATE = {
 
 function deepMerge(target, source) {
   const result = { ...target };
-  for (const key of Object.keys(source || {})) {
-    const s = source[key];
-    const t = target ? target[key] : undefined;
-    if (s !== null && typeof s === "object" && !Array.isArray(s)
-        && t !== null && typeof t === "object" && !Array.isArray(t)) {
-      result[key] = deepMerge(t, s);
+  for (const key of Object.keys(source)) {
+    if (source[key] !== null && typeof source[key] === "object" && !Array.isArray(source[key])
+        && typeof target[key] === "object" && !Array.isArray(target[key])) {
+      result[key] = deepMerge(target[key], source[key]);
     } else {
-      result[key] = s;
+      result[key] = source[key];
     }
   }
   return result;
 }
 
-let _state = clone(DEFAULT_STATE);
+let _state = JSON.parse(JSON.stringify(DEFAULT_STATE));
 let _ready = false;
-let _loaded = false;      // true só depois de ler (ou criar) a linha no banco
-let _retryTimer = null;
-let _saving = false;
-let _dirty = false;
-let _saveRetry = null;
 
-// Lê o estado do Supabase. Lança erro se não conseguir (nunca cai em "padrões" em silêncio).
-async function carregar() {
-  if (!supabase) throw new Error("Supabase não configurado.");
-  const { data, error } = await supabase
-    .from("roleta_estado")
-    .select("data")
-    .eq("id", ROW_ID)
-    .maybeSingle();
-  if (error) throw error;
-
-  if (data?.data) {
-    _state = deepMerge(clone(DEFAULT_STATE), data.data);
-    _loaded = true;
-    console.log("[store] Estado carregado do Supabase.");
-  } else {
-    // Primeiro deploy: a linha ainda não existe — cria com os valores padrão.
-    _state = clone(DEFAULT_STATE);
-    _loaded = true;
-    await gravar();
-    console.log("[store] Nenhum estado encontrado — linha inicial criada no Supabase.");
-  }
-}
-
-function agendarRetry() {
-  if (_retryTimer) return;
-  _retryTimer = setTimeout(async () => {
-    _retryTimer = null;
-    try {
-      await carregar();
-      console.warn("[store] Supabase voltou — estado recarregado do banco (alterações feitas durante a queda não foram gravadas).");
-    } catch (e) {
-      agendarRetry();
-    }
-  }, RETRY_MS);
-  if (_retryTimer.unref) _retryTimer.unref();
-}
-
+// Carrega o estado do Supabase na subida do servidor.
+// Se a linha ainda não existir (primeiro deploy), cria com os valores padrão.
 async function init() {
   try {
-    await carregar();
+    const { data, error } = await supabase
+      .from("roleta_estado")
+      .select("data")
+      .eq("id", ROW_ID)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (data?.data) {
+      _state = deepMerge(DEFAULT_STATE, data.data);
+      console.log("[store] Estado carregado do Supabase.");
+    } else {
+      _state = JSON.parse(JSON.stringify(DEFAULT_STATE));
+      await persist();
+      console.log("[store] Nenhum estado encontrado — linha inicial criada no Supabase.");
+    }
   } catch (e) {
-    console.error("[store] Não foi possível carregar o estado do Supabase:", e.message);
-    console.error("[store] MODO DEGRADADO: usando padrões em memória e NÃO gravando no banco até o Supabase voltar.");
-    _state = clone(DEFAULT_STATE);
-    _loaded = false;
-    agendarRetry();
+    console.error("[store] Erro ao carregar estado do Supabase, usando padrões em memória:", e.message);
+    _state = JSON.parse(JSON.stringify(DEFAULT_STATE));
   }
   _ready = true;
 }
 
-// Grava o estado atual (upsert da linha única). Uma gravação por vez; se chegar
-// mudança durante uma gravação, faz mais uma rodada com o estado mais recente.
-async function gravar() {
-  if (!_loaded) return; // modo degradado — não sobrescreve o banco
-  if (_saving) { _dirty = true; return; }
-  _saving = true;
+// Grava o estado atual no Supabase (upsert da linha única).
+async function persist() {
   try {
-    do {
-      _dirty = false;
-      const { error } = await supabase
-        .from("roleta_estado")
-        .upsert({ id: ROW_ID, data: clone(_state), updated_at: new Date().toISOString() });
-      if (error) throw error;
-    } while (_dirty);
+    const { error } = await supabase
+      .from("roleta_estado")
+      .upsert({ id: ROW_ID, data: _state, updated_at: new Date().toISOString() });
+    if (error) throw error;
   } catch (e) {
     console.error("[store] Erro ao salvar estado no Supabase:", e.message);
-    if (!_saveRetry) {
-      _saveRetry = setTimeout(() => { _saveRetry = null; gravar(); }, 10_000);
-      if (_saveRetry.unref) _saveRetry.unref();
-    }
-  } finally {
-    _saving = false;
   }
 }
 
+// Salva em segundo plano (não bloqueia a resposta HTTP) — mesmo espírito do
+// fs.writeFileSync "melhor esforço" que existia antes, mas agora assíncrono.
 function save(state) {
   _state = state;
-  gravar(); // segundo plano — não bloqueia a resposta HTTP
+  persist();
 }
 
 module.exports = {
   isReady: () => _ready,
-  isPersistent: () => _loaded,
   init,
   get: () => _state,
-  // Substitui o estado; seções ausentes são preenchidas com os padrões.
-  set: (newState) => { save(deepMerge(clone(DEFAULT_STATE), newState)); return _state; },
+  set: (newState) => { save(newState); },
   patch: (section, partial) => {
-    _state[section] = { ...(_state[section] || {}), ...partial };
+    _state[section] = { ..._state[section], ...partial };
     save(_state);
     return _state[section];
   },
   pushHistorico: (vencedor) => {
-    const atual = Array.isArray(_state.historico) ? _state.historico : [];
-    _state.historico = [vencedor, ...atual].slice(0, 50);
+    _state.historico = [vencedor, ..._state.historico].slice(0, 50);
     save(_state);
     return _state.historico;
   },
-  reset: () => { save(clone(DEFAULT_STATE)); return _state; },
-  _deepMerge: deepMerge, // exposto para testes
+  reset: () => { _state = JSON.parse(JSON.stringify(DEFAULT_STATE)); save(_state); return _state; },
 };
